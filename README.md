@@ -2,7 +2,7 @@
 
 This project implements and analyzes various improvements to a baseline Button Network model using agent-based modeling to study percolation phenomena and network formation dynamics.
 
-## 🧩 Core Concepts
+## Core Concepts
 
 ### What is a Button Network?
 
@@ -29,7 +29,7 @@ The model starts with isolated nodes (buttons) and gradually adds connections (t
 - **Giant Component**: The largest connected subgraph that contains a significant fraction of all nodes
 - **Phase Transition**: The rapid change from disconnected fragments to a single large connected component
 
-## 📊 Models and Improvements
+## Models and Improvements
 
 ### 1. Baseline Model (`baseline_button_network.py`)
 
@@ -124,7 +124,7 @@ Models **temporal variations** in connection formation rates due to external eve
 - Provides most realistic representation of complex network formation
 - Enables sensitivity analysis of different mechanisms
 
-## 🔬 Analysis and Results
+## Analysis and Results
 
 ### Percolation Threshold Analysis
 
@@ -161,7 +161,7 @@ From the provided visualization:
 - **Non-monotonic Effects**: Some improvements may increase threshold (slower percolation)
 - **Realistic Complexity**: Combined model shows most realistic network formation
 
-## 🚀 Running the Code
+## Running the Code
 
 ### Prerequisites
 
@@ -193,7 +193,7 @@ SHOCKS = dict(shock_steps=(8, 20), shock_multiplier=3.0, shock_duration=2)  # Sh
 ITERATIONS = 20  # Number of simulation runs for averaging
 ```
 
-## 📈 Scientific Significance
+## Scientific Significance
 
 This project demonstrates:
 
@@ -205,7 +205,7 @@ This project demonstrates:
 
 The Button Network serves as a powerful metaphor for understanding connectivity in social networks, infrastructure systems, epidemic spread, and other complex networks where percolation phenomena are crucial.
 
-## 🔧 Technical Details
+## Technical Details
 
 - **Framework**: AgentPy for agent-based modeling
 - **Network Analysis**: NetworkX for graph algorithms
@@ -213,7 +213,7 @@ The Button Network serves as a powerful metaphor for understanding connectivity 
 - **Visualization**: Matplotlib for plotting
 - **Reproducibility**: Seeded random number generation ensures consistent results
 
-## 📚 Further Reading
+## Further Reading
 
 - Percolation Theory: Stauffer & Aharony (1994)
 - Network Science: Barabási (2016)
