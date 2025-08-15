@@ -1,6 +1,8 @@
 # run_test.py
-# Runs baseline & improved Button Network models and plots a combined comparison curve.
-# Robust across AgentPy builds (handles long/wide dataframes; no hard dependency on .runtime).
+# Runs baseline & improved Button Network models and opens:
+# - one window per model (same color per model everywhere)
+# - one combined window overlaying all curves
+# Robust to AgentPy arrange_variables() returning "long" or "wide" frames.
 
 import agentpy as ap
 import matplotlib.pyplot as plt
@@ -14,18 +16,19 @@ from realistic_button_network import RealisticButtonModel
 
 # --------- parameters ---------
 BASE = dict(n=2000, steps=40, speed=0.03)
-
-# Heterogeneity params
 HETERO = dict(groups=3, activity_mu=-1.0, activity_sigma=0.8, homophily=0.75)
-
-# Capacity params
-CAPACITY = dict(capacity_mu=12, capacity_sigma=0)  # try smaller mu to make it tighter
-
-# Shocks params (tuples, not lists -> hashable for pandas/AgentPy)
+CAPACITY = dict(capacity_mu=12, capacity_sigma=0)
 SHOCKS = dict(shock_steps=(8, 20), shock_multiplier=3.0, shock_duration=2)
-
 ITERATIONS = 20
 
+# Consistent colors across all plots
+MODEL_COLORS = {
+    "Baseline":            "#1f77b4",  # blue
+    "Hetero+Homophily":    "#ff7f0e",  # orange
+    "Capacity":            "#2ca02c",  # green
+    "Shocks":              "#d62728",  # red
+    "All-toggles":         "#9467bd",  # purple
+}
 
 # --------- helpers ---------
 def run_exp(model_cls, params, iterations=ITERATIONS):
@@ -34,11 +37,10 @@ def run_exp(model_cls, params, iterations=ITERATIONS):
     exp = ap.Experiment(model_cls, sample, iterations=iterations, record=True)
     results = exp.run()
     print("Experiment finished")
-    # Some AgentPy builds don't expose .runtime; print only if we can find it.
+    # Print runtime only if available in this AgentPy build
     try:
         rt = getattr(results, "runtime", None)
         if rt is None and hasattr(results, "reporters"):
-            # sometimes stored as a reporter
             rt = results.reporters.get("runtime", None)
         if rt is None and hasattr(results, "info") and isinstance(results.info, dict):
             rt = results.info.get("runtime", None)
@@ -48,7 +50,6 @@ def run_exp(model_cls, params, iterations=ITERATIONS):
         pass
     return results
 
-
 def summarize_threshold(results, label):
     df = results.reporters
     thr = pd.to_numeric(df.get('threshold_t_over_b'), errors='coerce').mean()
@@ -56,9 +57,8 @@ def summarize_threshold(results, label):
     print(out)
     return out
 
-
 def _extract_xy(results):
-    """Return (x, y) averaged over iterations for this AgentPy results object.
+    """Return (x, y) averaged over iterations.
     Handles both LONG ('variable','value') and WIDE formats from arrange_variables()."""
     df = results.arrange_variables()
 
@@ -80,73 +80,27 @@ def _extract_xy(results):
             wide['t'] = range(len(wide))
         x = wide['threads_to_button']
         y = wide['giant_frac']
-
     return x, y
 
-def _threshold_from_curve(x, y, target=0.5):
-    """Return (x*, y*) where the curve first reaches target (linear interpolation)."""
-    import numpy as np
-    xv = x.to_numpy() if hasattr(x, "to_numpy") else np.asarray(x)
-    yv = y.to_numpy() if hasattr(y, "to_numpy") else np.asarray(y)
-    idx = (yv >= target).nonzero()[0]
-    if len(idx) == 0:
-        return float('nan'), float('nan')
-    i = idx[0]
-    if i == 0:
-        return float(xv[0]), float(yv[0])
-    # linear interpolate between (i-1) and i
-    x0, x1 = xv[i-1], xv[i]
-    y0, y1 = yv[i-1], yv[i]
-    if y1 == y0:
-        return float(x1), float(y1)
-    x_star = x0 + (target - y0) * (x1 - x0) / (y1 - y0)
-    return float(x_star), float(target)
-
-
-def plot_all_curves_annotated(results_dict, title="Giant component vs Threads/Buttons"):
-    """Overlay curves and annotate threshold (giant_frac=0.5) for each model."""
-    import matplotlib.pyplot as plt
-
+def plot_single_curve(label, results):
+    """Open a window with one curve, colored consistently and titled per improvement."""
+    color = MODEL_COLORS.get(label, None)
+    x, y = _extract_xy(results)
     plt.figure()
-    threshold_rows = []  # for printing a quick table after the plot
-
-    for label, res in results_dict.items():
-        x, y = _extract_xy(res)
-        plt.plot(x, y, label=label)
-
-        # Annotate threshold from the averaged curve
-        x_star, y_star = _threshold_from_curve(x, y, target=0.5)
-        if x_star == x_star:  # not NaN
-            plt.scatter([x_star], [y_star], s=35, marker='o')
-            plt.annotate(f'{label}\n≈ {x_star:.3f}',
-                         xy=(x_star, y_star),
-                         xytext=(5, 5), textcoords='offset points',
-                         fontsize=8)
-        # Also pull the run-reported mean threshold if available
-        import pandas as pd
-        thr_report = pd.to_numeric(res.reporters.get('threshold_t_over_b'), errors='coerce').mean()
-        threshold_rows.append((label, thr_report, x_star))
-
-    plt.axhline(0.5, ls='--', lw=1, alpha=0.6)  # target line
+    plt.plot(x, y, label=label, color=color)
     plt.xlabel('Threads / Buttons')
     plt.ylabel('Largest component (fraction)')
-    plt.title(title + ' (threshold = 0.5)')
-    plt.legend()
+    plt.title(f'Giant component vs Threads/Buttons — {label}')
     plt.tight_layout()
-    plt.show()
-
-    # Print a compact comparison table (reported vs from-curve)
-    print("\nEstimated thresholds (threads/buttons):")
-    for label, rep, curve in threshold_rows:
-        rep_txt = "NaN" if pd.isna(rep) else f"{rep:.3f}"
-        curve_txt = "NaN" if curve != curve else f"{curve:.3f}"
-        print(f"- {label:16s} reported ≈ {rep_txt} | curve ≈ {curve_txt}")
+    plt.show(block=False)  # show but don't block subsequent windows
 
 def plot_all_curves(results_dict, title="Giant component vs Threads/Buttons"):
+    """Open a window with all curves overlaid, colors matching single plots."""
     plt.figure()
     for label, res in results_dict.items():
+        color = MODEL_COLORS.get(label, None)
         x, y = _extract_xy(res)
-        plt.plot(x, y, label=label)
+        plt.plot(x, y, label=label, color=color)
     plt.xlabel('Threads / Buttons')
     plt.ylabel('Largest component (fraction)')
     plt.title(title)
@@ -154,27 +108,30 @@ def plot_all_curves(results_dict, title="Giant component vs Threads/Buttons"):
     plt.tight_layout()
     plt.show()
 
-
 # --------- main ---------
 if __name__ == "__main__":
     # Baseline
     res_base = run_exp(BaselineButtonModel, BASE, iterations=ITERATIONS)
     summarize_threshold(res_base, 'Baseline')
+    plot_single_curve('Baseline', res_base)
 
     # Heterogeneity + Homophily
     P1 = dict(BASE, **HETERO)
     res_i1 = run_exp(ButtonHeteroHomophily, P1, iterations=ITERATIONS)
     summarize_threshold(res_i1, 'Hetero+Homophily')
+    plot_single_curve('Hetero+Homophily', res_i1)
 
     # Capacity constraints
     P2 = dict(BASE, **CAPACITY)
     res_i2 = run_exp(ButtonWithCapacity, P2, iterations=ITERATIONS)
     summarize_threshold(res_i2, 'Capacity')
+    plot_single_curve('Capacity', res_i2)
 
     # Shocks only
     P3 = dict(BASE, **SHOCKS)
     res_i3 = run_exp(ButtonWithShocks, P3, iterations=ITERATIONS)
     summarize_threshold(res_i3, 'Shocks')
+    plot_single_curve('Shocks', res_i3)
 
     # All toggles combined
     PALL = dict(
@@ -185,13 +142,13 @@ if __name__ == "__main__":
     )
     res_all = run_exp(RealisticButtonModel, PALL, iterations=ITERATIONS)
     summarize_threshold(res_all, 'All-toggles')
+    plot_single_curve('All-toggles', res_all)
 
-    # Combined comparison plot (overlay all curves)
-    plot_all_curves_annotated({
-    'Baseline': res_base,
-    'Hetero+Homophily': res_i1,
-    'Capacity': res_i2,
-    'Shocks': res_i3,
-    'All-toggles': res_all
+    # Combined comparison (last window)
+    plot_all_curves({
+        'Baseline': res_base,
+        'Hetero+Homophily': res_i1,
+        'Capacity': res_i2,
+        'Shocks': res_i3,
+        'All-toggles': res_all
     })
-
